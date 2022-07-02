@@ -2,10 +2,10 @@ import * as dotenv from "dotenv";
 
 import { HardhatUserConfig, task } from "hardhat/config";
 import "@nomiclabs/hardhat-etherscan";
-import "@nomiclabs/hardhat-waffle";
-import "@typechain/hardhat";
 import "hardhat-gas-reporter";
-import "solidity-coverage";
+import '@typechain/hardhat'
+import '@nomiclabs/hardhat-ethers'
+import '@nomiclabs/hardhat-waffle'
 
 dotenv.config();
 
@@ -22,21 +22,35 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
+const accounts =
+  process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [];
+
 const config: HardhatUserConfig = {
-  solidity: "0.8.4",
+  solidity: "0.8.12",
   networks: {
-    ropsten: {
-      url: process.env.ROPSTEN_URL || "",
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    rinkeby: {
+      url: process.env.RINKEBY_URL || "",
+      accounts
     },
+    bnb_testnet: {
+      url: process.env.BNB_TESTNET_URL || "",
+      accounts
+    },
+    polygon: {
+      url: process.env.POLYGON_URL || "",
+      accounts
+    },
+    bsc: {
+      url: process.env.BSC_URL || "",
+      accounts
+    }
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: {}
   },
 };
 

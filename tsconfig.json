@@ -5,8 +5,16 @@
     "strict": true,
     "esModuleInterop": true,
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    "sourceMap": true,
   },
-  "include": ["./scripts", "./test", "./typechain"],
-  "files": ["./hardhat.config.ts"]
+  "exclude": ["artifacts", "build", "cache", "node_modules"],
+  "include": [
+    "deploy/**/*",
+    "scripts/**/*",
+    "test/**/*",
+    "typechain/**/*",
+    "types/**/*",
+    "hardhat.config.ts"
+  ]
 }
