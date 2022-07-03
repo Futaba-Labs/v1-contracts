@@ -17,8 +17,8 @@ async function main() {
   // We get the contract to deploy
   const Swap = await ethers.getContractFactory("TransferSwapper");
 
-  const router = bscData.router
-  const nativeToken = bscData.nativeToken
+  const router = rinkebyData.router
+  const nativeToken = rinkebyData.nativeToken
   const swap = await Swap.deploy(nativeToken, router);
 
   await swap.deployed();

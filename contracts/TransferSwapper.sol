@@ -21,6 +21,22 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
+    event SrcChainSwap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint16 dstChainId,
+        address router,
+        address crossRouter
+    );
+
+    event DstChainSwap(
+        address bridgedToken,
+        uint256 bridgedAmount,
+        address tokenOut,
+        uint256 amountOut
+    );
+
     struct TransferDescription {
         address payable to;
         bool nativeIn;
@@ -95,30 +111,45 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
         // uint256 gasValue = msg.value;
         // executeBridge(_transferDesc, _dstSwapDesc);
         uint256 sumAmtOut;
-        if(_transferDesc.srcSkipSwap) {
+        if (_transferDesc.srcSkipSwap) {
             IERC20(_transferDesc.tokenIn).safeTransferFrom(
                 msg.sender,
                 address(this),
                 _transferDesc.amountIn
             );
-            sumAmtOut = IERC20(_transferDesc.tokenOut).balanceOf(
-            address(this)
-        );
+            sumAmtOut = IERC20(_transferDesc.tokenOut).balanceOf(address(this));
         } else {
             sumAmtOut = executeSwap(_transferDesc, _srcSwapDesc);
         }
-        require(sumAmtOut <= IERC20(_transferDesc.tokenOut).balanceOf(address(this)), "!bridgeAmount");
-        IERC20(_transferDesc.tokenOut).safeIncreaseAllowance(address(stargateRouter), sumAmtOut);
+        require(
+            sumAmtOut <=
+                IERC20(_transferDesc.tokenOut).balanceOf(address(this)),
+            "!bridgeAmount"
+        );
+        IERC20(_transferDesc.tokenOut).safeIncreaseAllowance(
+            address(stargateRouter),
+            sumAmtOut
+        );
 
         require(_transferDesc.to != address(0), "to_ZERO_ADDR"); // NOTE: double check it
 
         uint16 dstChainId = _transferDesc.dstChainId;
         uint16 srcChainId = _transferDesc.srcChainId;
-        bytes memory dstSwapDesc = abi.encode(_dstSwapDesc, _transferDesc.dstRouter, _transferDesc.nativeOut);
+        bytes memory dstSwapDesc = abi.encode(
+            _dstSwapDesc,
+            _transferDesc.dstRouter,
+            _transferDesc.nativeOut
+        );
 
-        bytes memory dstCrossRouter = abi.encodePacked(crossRouters[dstChainId]);
-        uint256 minBridgeAmount = sumAmtOut.mul(uint256(10000).sub(bridgeSlippage)).div(10000);
-        uint256 dstGas = _transferDesc.dstSkipSwap ? dstGasForNoSwapCall : dstGasForSwapCall;
+        bytes memory dstCrossRouter = abi.encodePacked(
+            crossRouters[dstChainId]
+        );
+        uint256 minBridgeAmount = sumAmtOut
+            .mul(uint256(10000).sub(bridgeSlippage))
+            .div(10000);
+        uint256 dstGas = _transferDesc.dstSkipSwap
+            ? dstGasForNoSwapCall
+            : dstGasForSwapCall;
         uint256 gasValue = msg.value;
 
         stargateRouter.swap{value: gasValue}(
@@ -132,6 +163,7 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
             dstCrossRouter, // smart contract to call on dst chain
             dstSwapDesc // payload to piggyback
         );
+        // emit SrcChainSwap(_transferDesc.tokenIn, _transferDesc.tokenOut, )
     }
 
     function executeBridge(
@@ -142,7 +174,11 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
         uint256 gasValue = msg.value;
         uint16 dstChainId = _transferDesc.dstChainId;
         uint16 srcChainId = _transferDesc.srcChainId;
-        bytes memory dstSwapDesc = abi.encode(_dstSwapDesc, _transferDesc.dstRouter, _transferDesc.nativeOut);
+        bytes memory dstSwapDesc = abi.encode(
+            _dstSwapDesc,
+            _transferDesc.dstRouter,
+            _transferDesc.nativeOut
+        );
 
         TransferHelper.safeTransferFrom(
             _transferDesc.tokenIn,
@@ -202,13 +238,17 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
         uint256 beforeAmount = IERC20(_transferDesc.tokenOut).balanceOf(
             address(this)
         );
-        if (_transferDesc.srcChainId == 9 || _transferDesc.srcChainId == 10001) {
+        if (
+            _transferDesc.srcChainId == 9 || _transferDesc.srcChainId == 10001
+        ) {
             ISwapRouter router = ISwapRouter(_transferDesc.router);
             ISwapRouter.ExactInputParams memory params = decodeCalldataUniV3(
                 _srcSwapDesc
             );
             router.exactInput(params);
-        } else if (_transferDesc.srcChainId == 2 || _transferDesc.srcChainId == 10002) {
+        } else if (
+            _transferDesc.srcChainId == 2 || _transferDesc.srcChainId == 10002
+        ) {
             IUniswapV2Router02 router = IUniswapV2Router02(
                 _transferDesc.router
             );
@@ -245,11 +285,13 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
     ) external view returns (uint256, uint256) {
         bytes memory toAddress = abi.encodePacked(to);
 
-        bytes memory dstSwapDesc = abi.encode(_dstSwapDesc, dstRouter, nativeOut);
+        bytes memory dstSwapDesc = abi.encode(
+            _dstSwapDesc,
+            dstRouter,
+            nativeOut
+        );
 
-        uint256 dstGas = swapSkip
-            ? dstGasForNoSwapCall
-            : dstGasForSwapCall;
+        uint256 dstGas = swapSkip ? dstGasForNoSwapCall : dstGasForSwapCall;
         return
             stargateRouter.quoteLayerZeroFee(
                 dstChainId,
@@ -273,25 +315,67 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
             "only stargate router can call sgReceive!"
         );
 
-        (bytes memory dstSwapDesc, address dstRouter, bool nativeOut) = abi.decode((_payload), (bytes, address, bool));
+        (bytes memory dstSwapDesc, address dstRouter, bool nativeOut) = abi
+            .decode((_payload), (bytes, address, bool));
 
-        TransferHelper.safeApprove(
-            _token,
+        if (dstRouter == address(0)) {
+            IERC20(_token).safeTransferFrom(
+                address(this),
+                msg.sender,
+                amountLD
+            );
+            emit DstChainSwap(_token, amountLD, _token, amountLD);
+            return;
+        }
+        (uint256 sumAmtOut, address to) = executeDstSwap(
             dstRouter,
-            amountLD
+            dstSwapDesc,
+            _chainId,
+            _token,
+            amountLD,
+            nativeOut
         );
+        emit DstChainSwap(_token, amountLD, nativeWrap, sumAmtOut);
+        // if (nativeOut) {
+        //     IWETH(nativeWrap).withdraw(sumAmtOut);
+        //     TransferHelper.safeApprove(_token, dstRouter, amountLD);
+        //     TransferHelper.safeTransferETH(to, sumAmtOut);
+        //     emit DstChainSwap(_token, amountLD, nativeWrap, sumAmtOut);
+        // } else {
+        //     emit DstChainSwap(_token, amountLD, _token, sumAmtOut);
+        // }
+    }
 
-        if(_chainId == 10002 || _chainId == 2) {
+    function executeDstSwap(
+        address dstRouter,
+        bytes memory dstSwapDesc,
+        uint16 _chainId,
+        address _token,
+        uint256 amountLD,
+        bool nativeOut
+    ) internal returns (uint256 sumAmtOut, address toAddress) {
+        TransferHelper.safeApprove(_token, dstRouter, amountLD);
+
+        uint256 sumAmtOut;
+
+        if (_chainId == 10002 || _chainId == 2) {
             ISwapRouter router = ISwapRouter(dstRouter);
             ISwapRouter.ExactInputParams memory params = decodeCalldataUniV3(
                 dstSwapDesc
             );
             params.amountIn = amountLD;
-            router.exactInput(params);
-        } else if(_chainId == 10001 ||  _chainId == 9) {
-             IUniswapV2Router02 router = IUniswapV2Router02(
-                dstRouter
-            );
+            toAddress = params.recipient;
+            if(nativeOut) {
+                params.recipient = address(this);
+            }
+            sumAmtOut = router.exactInput(params);
+
+            if(nativeOut) {
+                IWETH(nativeWrap).withdraw(sumAmtOut);
+                TransferHelper.safeTransferETH(toAddress, sumAmtOut);
+            }
+        } else if (_chainId == 10001 || _chainId == 9) {
+            IUniswapV2Router02 router = IUniswapV2Router02(dstRouter);
             (
                 uint256 amountIn,
                 uint256 amountOutMin,
@@ -299,44 +383,35 @@ contract TransferSwapper is Ownable, ReentrancyGuard, IStargateReceiver {
                 address to,
                 uint256 deadline
             ) = decodeCalldataUniV2(dstSwapDesc);
-            router.swapExactTokensForTokens(
-                amountLD,
-                amountOutMin,
-                path,
-                to,
-                deadline
-            );
-
-        //     TransferHelper.safeApprove(
-        //     _token,
-        //     address(this),
-        //     amountLD
-        // );
-
-        //     IERC20(_token).safeTransferFrom(
-        //         address(this),
-        //         0x221E25Ad7373Fbaf33C7078B8666816586222A09,
-        //         amountLD
-        //     );
-        } else {
-            revert("unsupported chain");
+            if (nativeOut) {
+                uint256[] memory amounts = router.swapExactTokensForETH(
+                    amountLD,
+                    amountOutMin,
+                    path,
+                    to,
+                    deadline
+                );
+                sumAmtOut = amounts[1];
+            } else {
+                uint256[] memory amounts = router.swapExactTokensForTokens(
+                    amountLD,
+                    amountOutMin,
+                    path,
+                    to,
+                    deadline
+                );
+                sumAmtOut = amounts[1];
+            }
+            toAddress = to;
         }
     }
 
     function refundToken(address _token) external payable {
         uint256 balance = IERC20(_token).balanceOf(address(this));
         require(balance < 0, "no refundable token");
-        IERC20(_token).safeIncreaseAllowance(
-            address(this),
-            balance
-        );
+        IERC20(_token).safeIncreaseAllowance(address(this), balance);
 
-        IERC20(_token).safeTransferFrom(
-                address(this),
-                msg.sender,
-                balance
-            );
-
+        IERC20(_token).safeTransferFrom(address(this), msg.sender, balance);
     }
 
     function decodeCalldataUniV3(bytes memory _swap)
